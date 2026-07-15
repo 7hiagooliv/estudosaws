@@ -1,0 +1,66 @@
+{
+  "Comment": "Workflow de Processamento de Pedidos com aprovação e notificação",
+  "StartAt": "VerificarPagamento",
+  "States": {
+    "VerificarPagamento": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:VerificarPagamento",
+      "Next": "PagamentoAprovado?"
+    },
+    "PagamentoAprovado?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.statusPagamento",
+          "StringEquals": "APROVADO",
+          "Next": "ProcessarPedido"
+        }
+      ],
+      "Default": "NotificarFalha"
+    },
+    "ProcessarPedido": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "AtualizarEstoque",
+          "States": {
+            "AtualizarEstoque": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:AtualizarEstoque",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "EnviarConfirmacaoSNS",
+          "States": {
+            "EnviarConfirmacaoSNS": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "arn:aws:sns:us-east-1:123456789012:ConfirmacaoPedido",
+                "Message": "Seu pedido foi processado com sucesso!"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "FinalizarPedido"
+    },
+    "FinalizarPedido": {
+      "Type": "Pass",
+      "Result": "Pedido finalizado com sucesso!",
+      "End": true
+    },
+    "NotificarFalha": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:FalhaPedido",
+        "Message": "Houve um problema com o pagamento do seu pedido."
+      },
+      "End": true
+    }
+  }
+}
